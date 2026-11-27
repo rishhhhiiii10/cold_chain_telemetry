@@ -1,23 +1,14 @@
 let io;
 
-const allowedOrigins = (process.env.CLIENT_URL || "")
-  .split(",")
-  .map((origin) => origin.trim());
+const cors = require("./cors");
 
 function initializeSocket(server) {
   const { Server } = require("socket.io");
 
   io = new Server(server, {
     cors: {
-      origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error("Not allowed by CORS"));
-        }
-      },
+      ...cors,
       methods: ["GET", "POST"],
-      credentials: true,
     },
   });
 

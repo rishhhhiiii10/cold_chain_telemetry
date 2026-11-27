@@ -12,14 +12,11 @@ extern BLEBeacon bleBeacon;
 
 void core0_comms_task(void *pvParameters) {
     uint8_t seq_counter = 0;
-    uint32_t last_sync_time = millis();
     
     while (true) {
         TelemetryPacket packet;
-        bool packet_received = false;
         
         if (xQueueReceive(telemetryQueue, &packet, pdMS_TO_TICKS(1000)) == pdTRUE) {
-            packet_received = true;
             
             BLEPayload ble_frame;
             ble_frame.company_id = BLE_COMPANY_ID;
@@ -44,6 +41,8 @@ void core0_comms_task(void *pvParameters) {
                 bleBeacon.stop();
             }
             
+            if (wifiClient.postRealtime(packet, ble_frame.seq_counter)) continue;
+
             CompactLogRecord compact;
             compact.timestamp = packet.timestamp;
             compact.temperature = packet.metrics.temperature;
@@ -53,26 +52,6 @@ void core0_comms_task(void *pvParameters) {
             compact.alerts = alert_mask;
             
             storageManager.saveRecord(compact);
-        }
-        
-        bool is_time_for_burst = (millis() - last_sync_time) >= INTERVAL_BURST_SYNC_MS;
-        bool is_urgent_override = packet_received && packet.alerts.is_urgent;
-
-        if (is_time_for_burst || is_urgent_override) {
-            if (wifiClient.isConnected()) {
-                CompactLogRecord batchBuffer[BATCH_MAX_UPLOAD_RECORDS];
-                size_t retrieved = 0;
-                
-                if (storageManager.readBatch(batchBuffer, BATCH_MAX_UPLOAD_RECORDS, retrieved) && retrieved > 0) {
-                    const char* n_id = packet_received ? packet.node_id : DEVICE_NODE_ID;
-                    const char* t_id = packet_received ? packet.trip_id : DEFAULT_TRIP_ID;
-
-                    if (wifiClient.postBatchSync(batchBuffer, retrieved, n_id, t_id)) {
-                        storageManager.commitSync();
-                    }
-                }
-            }
-            last_sync_time = millis();
         }
     }
 }

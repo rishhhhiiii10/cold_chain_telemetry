@@ -23,7 +23,9 @@ import { socket } from "../services/socket";
 
 import {
   Area,
-  AreaChart,
+  ComposedChart,
+  Legend,
+  Line,
   CartesianGrid,
   ReferenceLine,
   ResponsiveContainer,
@@ -223,10 +225,11 @@ function Dashboard() {
 
   // Prepare chart data without converting missing values to zero
   const chartData = telemetry
-    .filter((item) => item.temperature_c != null)
+    .filter((item) => item.temperature_c != null || item.vibration_rms != null)
     .map((item) => ({
       time: formatTime(item.recorded_at),
-      temperature: Number(item.temperature_c),
+      temperature: item.temperature_c == null ? null : Number(item.temperature_c),
+      vibration: item.vibration_rms == null ? null : Number(item.vibration_rms),
     }));
 
   const latest = telemetry[telemetry.length - 1];
@@ -442,22 +445,21 @@ function Dashboard() {
         </div>
       </section>
 
-      {/* Temperature history */}
+      {/* Sensor history */}
       <section className="panel chart-panel">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">ENVIRONMENTAL HISTORY</p>
 
-            <h2>Temperature Trend</h2>
+            <h2>Temperature and Vibration Trends</h2>
           </div>
 
-          <span className="chart-unit">°C</span>
         </div>
 
         <div className="chart-container">
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
+              <ComposedChart data={chartData}>
                 <defs>
                   <linearGradient
                     id="temperatureGradient"
@@ -481,15 +483,28 @@ function Dashboard() {
                 />
 
                 <YAxis
+                  yAxisId="temperature"
+                  unit="°C"
                   domain={["auto", "auto"]}
                   tick={{ fontSize: 12 }}
                   stroke="#94a3b8"
                 />
 
+                <YAxis
+                  yAxisId="vibration"
+                  orientation="right"
+                  domain={[0, "auto"]}
+                  unit="g"
+                  tick={{ fontSize: 12 }}
+                  stroke="#0f766e"
+                />
+
                 <Tooltip />
+                <Legend />
 
                 {/* Prototype temperature limits */}
                 <ReferenceLine
+                  yAxisId="temperature"
                   y={2}
                   stroke="#16a34a"
                   strokeDasharray="5 5"
@@ -502,6 +517,7 @@ function Dashboard() {
                 />
 
                 <ReferenceLine
+                  yAxisId="temperature"
                   y={8}
                   stroke="#dc2626"
                   strokeDasharray="5 5"
@@ -514,6 +530,8 @@ function Dashboard() {
                 />
 
                 <Area
+                  yAxisId="temperature"
+                  unit=" °C"
                   type="monotone"
                   dataKey="temperature"
                   name="Temperature"
@@ -522,7 +540,16 @@ function Dashboard() {
                   fill="url(#temperatureGradient)"
                   connectNulls={false}
                 />
-              </AreaChart>
+                <Line
+                  yAxisId="vibration"
+                  dataKey="vibration"
+                  name="Vibration RMS"
+                  unit=" g"
+                  stroke="#0f766e"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           ) : (
             <div className="empty-state">No telemetry readings available.</div>
